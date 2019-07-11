@@ -24,9 +24,9 @@ void print_platform_info(cl_platform_id platform)
   }
 }
 
-template<typename T> T to_string(const T& t) { return t; }
-std::string to_string(const cl_bool t) { return t ? "true" : "false"; }
-std::string to_string(const cl_device_type t)
+template<typename T> T noop(const T& t) { return t; }
+std::string bool_to_string(const cl_bool t) { return t ? "true" : "false"; }
+std::string device_type_to_string(const cl_device_type t)
 {
   std::ostringstream ss;
   if (t & CL_DEVICE_TYPE_CPU) { ss << "cpu"; }
@@ -36,16 +36,25 @@ std::string to_string(const cl_device_type t)
   return ss.str();
 }
 
+std::string device_mem_cache_type_to_string(const cl_device_mem_cache_type t)
+{
+  switch (t) {
+    case CL_NONE: return "none";
+    case CL_READ_ONLY_CACHE: return "read only";
+    case CL_READ_WRITE_CACHE: return "read write";
+    default: return "FAIL";
+  }
+}
 
-template<typename T>
-void print_device_info(cl_device_id device, cl_device_info parameter, const char* label)
+template<typename T, typename F>
+void print_device_info(cl_device_id device, cl_device_info parameter, const char* label, F&& f)
 {
   T t;
   const cl_int error = clGetDeviceInfo(device, parameter, sizeof(T), &t, nullptr);
   if (error != CL_SUCCESS) {
     std::cerr << "Failed to get info " << parameter << ": " << error << std::endl;
   } else {
-    std::cout << label << ": " << to_string(t) << std::endl;
+    std::cout << label << ": " << f(t) << std::endl;
   }
 }
 
@@ -72,13 +81,35 @@ void print_device_info(cl_device_id device)
     std::cout << p.second << ": " << text_buffer << std::endl;
   }
 
-  print_device_info<cl_device_type>(device, CL_DEVICE_TYPE, "type");
-  print_device_info<cl_bool>(device, CL_DEVICE_COMPILER_AVAILABLE, "compiler available");
-  print_device_info<cl_bool>(device, CL_DEVICE_ENDIAN_LITTLE, "little endian");
-  print_device_info<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, "global cache in bytes");
-  print_device_info<cl_device_mem_cache_type>(device, CL_DEVICE_GLOBAL_MEM_CACHE_TYPE,
-                                              "global cache type");
-  print_device_info<cl_bool>(device, CL_DEVICE_IMAGE_SUPPORT, "image support");
+  print_device_info<cl_device_type>(device,
+                                    CL_DEVICE_TYPE,
+                                    "type",
+                                    device_type_to_string);
+
+  print_device_info<cl_bool>(device,
+                             CL_DEVICE_COMPILER_AVAILABLE,
+                             "compiler available",
+                             bool_to_string);
+
+  print_device_info<cl_bool>(device,
+                             CL_DEVICE_ENDIAN_LITTLE,
+                             "little endian",
+                             bool_to_string);
+
+  print_device_info<cl_ulong>(device,
+                              CL_DEVICE_GLOBAL_MEM_CACHE_SIZE,
+                              "global cache in bytes",
+                              noop<cl_ulong>);
+
+  print_device_info<cl_device_mem_cache_type>(device,
+                                              CL_DEVICE_GLOBAL_MEM_CACHE_TYPE,
+                                              "global cache type",
+                                              device_mem_cache_type_to_string);
+
+  print_device_info<cl_bool>(device,
+                             CL_DEVICE_IMAGE_SUPPORT,
+                             "image support",
+                             bool_to_string);
   
   // TODO there are many more fields ...
 
